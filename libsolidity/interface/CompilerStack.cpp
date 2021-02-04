@@ -1597,10 +1597,12 @@ bytes CompilerStack::createCBORMetadata(Contract const& _contract) const
 
 	if (experimentalMode || m_viaIR)
 		encoder.pushBool("experimental", true);
-	if (m_release)
+	if (m_versionType == VersionType::Release)
 		encoder.pushBytes("solc", VersionCompactBytes);
-	else
+	else if (m_versionType == VersionType::Prerelease)
 		encoder.pushString("solc", VersionStringStrict);
+	else
+		solAssert(m_versionType == VersionType::Empty, "Invalid version type");
 	return encoder.serialise();
 }
 
