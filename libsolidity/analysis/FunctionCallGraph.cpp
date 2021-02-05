@@ -58,10 +58,15 @@ FunctionCallGraphBuilder::FunctionCallGraphBuilder(ContractDefinition const& _co
 	for (FunctionTypePointer functionType: _contract.interfaceFunctionList() | views::transform(getSecondElement))
 	{
 		if (auto const* funcDef = dynamic_cast<FunctionDefinition const*>(&functionType->declaration()))
+		{
 			processFunction(funcDef);
 
-		// Add all external functions to the RuntimeDispatch
-		add(SpecialNode::Entry, &functionType->declaration());
+			// Add all external functions to the RuntimeDispatch
+			add(SpecialNode::Entry, &functionType->declaration());
+		}
+		else
+			// If it's not a function, it must be a getter of a public variable; we ignore those
+			solAssert(dynamic_cast<VariableDeclaration const*>(&functionType->declaration()), "");
 	}
 
 	// Add all InternalCreationDispatch calls to the RuntimeDispatch as well
