@@ -91,7 +91,7 @@ BOOST_AUTO_TEST_CASE(string_storage)
 			}
 		}
 	)";
-	m_compiler.setVersionType(CompilerStack::VersionType::Release);
+	m_compiler.setMetadataFormat(CompilerStack::MetadataFormat::WithReleaseVersionTag);
 	compileAndRun(sourceCode);
 
 	auto evmVersion = solidity::test::CommonOptions::get().evmVersion();

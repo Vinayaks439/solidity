@@ -112,7 +112,7 @@ SemanticTest::SemanticTest(
 
 	if (_evmVersion == EVMVersion{})
 	{
-		m_compiler.setVersionType(CompilerStack::VersionType::Empty);
+		m_compiler.setMetadataFormat(CompilerStack::MetadataFormat::NoMetadata);
 		m_compiler.setMetadataHash(CompilerStack::MetadataHash::None);
 	}
 }

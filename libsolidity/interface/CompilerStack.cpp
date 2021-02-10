@@ -1580,7 +1580,7 @@ private:
 
 bytes CompilerStack::createCBORMetadata(Contract const& _contract) const
 {
-	if (m_versionType == VersionType::Empty)
+	if (m_metadataFormat == MetadataFormat::NoMetadata)
 		return bytes{};
 
 	bool const experimentalMode = !onlySafeExperimentalFeaturesActivated(
@@ -1600,12 +1600,16 @@ bytes CompilerStack::createCBORMetadata(Contract const& _contract) const
 
 	if (experimentalMode || m_viaIR)
 		encoder.pushBool("experimental", true);
-	if (m_versionType == VersionType::Release)
+	if (m_metadataFormat == MetadataFormat::WithReleaseVersionTag)
 		encoder.pushBytes("solc", VersionCompactBytes);
-	else if (m_versionType == VersionType::Prerelease)
-		encoder.pushString("solc", VersionStringStrict);
 	else
-		solAssert(m_versionType == VersionType::Empty, "Invalid version type");
+	{
+		solAssert(
+			m_metadataFormat == MetadataFormat::WithPrereleaseVersionTag,
+			"Invalid metadata format"
+		);
+		encoder.pushString("solc", VersionStringStrict);
+	}
 	return encoder.serialise();
 }
 
