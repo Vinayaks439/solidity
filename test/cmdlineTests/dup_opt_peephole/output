@@ -6,12 +6,12 @@ EVM assembly:
   callvalue
   dup1
   iszero
-  tag_1
+  tag_2
   jumpi
   0x00
   dup1
   revert
-tag_1:
+tag_2:
   pop
   dataSize(sub_0)
   dup1
@@ -28,12 +28,12 @@ sub_0: assembly {
       callvalue
       dup1
       iszero
-      tag_3
+      tag_4
       jumpi
       0x00
       dup1
       revert
-    tag_3:
+    tag_4:
       pop
         /* "dup_opt_peephole/input.sol":74:75  0 */
       0x00

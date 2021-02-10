@@ -16,14 +16,14 @@ EVM assembly:
     /* "optimizer_user_yul/input.sol":195:207  sstore(0, 1) */
   sstore
     /* "optimizer_user_yul/input.sol":212:258  for { } sload(4) { } {... */
-tag_3:
+tag_4:
     /* "optimizer_user_yul/input.sol":226:227  4 */
   0x04
     /* "optimizer_user_yul/input.sol":220:228  sload(4) */
   sload
     /* "optimizer_user_yul/input.sol":212:258  for { } sload(4) { } {... */
   iszero
-  tag_5
+  tag_6
   jumpi
   pop
     /* "optimizer_user_yul/input.sol":244:253  exp(x, y) */
@@ -31,8 +31,8 @@ tag_3:
   dup3
   exp
     /* "optimizer_user_yul/input.sol":212:258  for { } sload(4) { } {... */
-  jump(tag_3)
-tag_5:
+  jump(tag_4)
+tag_6:
     /* "optimizer_user_yul/input.sol":216:219  { } */
   pop
   pop
@@ -54,14 +54,14 @@ tag_5:
   sload
   iszero
     /* "optimizer_user_yul/input.sol":376:509  for { } sload(5) { } {... */
-tag_6:
+tag_8:
     /* "optimizer_user_yul/input.sol":384:392  sload(5) */
   dup1
     /* "optimizer_user_yul/input.sol":376:509  for { } sload(5) { } {... */
-  tag_8
+  tag_10
   jumpi
-  jump(tag_6)
-tag_8:
+  jump(tag_8)
+tag_10:
     /* "optimizer_user_yul/input.sol":380:383  { } */
   pop
     /* "optimizer_user_yul/input.sol":340:513  {... */

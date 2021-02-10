@@ -6,12 +6,12 @@ EVM assembly:
   callvalue
   dup1
   iszero
-  tag_1
+  tag_2
   jumpi
   0x00
   dup1
   revert
-tag_1:
+tag_2:
   pop
   dataSize(sub_0)
   dup1
@@ -28,38 +28,38 @@ sub_0: assembly {
       callvalue
       dup1
       iszero
-      tag_1
+      tag_2
       jumpi
       0x00
       dup1
       revert
-    tag_1:
+    tag_2:
       pop
-      jumpi(tag_2, lt(calldatasize, 0x04))
+      jumpi(tag_3, lt(calldatasize, 0x04))
       shr(0xe0, calldataload(0x00))
       dup1
       0x26121ff0
       eq
-      tag_3
+      tag_4
       jumpi
-    tag_2:
+    tag_3:
       0x00
       dup1
       revert
         /* "optimizer_inliner_multireturn/input.sol":179:296  function f() public pure {... */
-    tag_3:
-      tag_4
-      tag_5
-      jump	// in
     tag_4:
-      stop
+      tag_5
+      tag_6
+      jump	// in
     tag_5:
+      stop
+    tag_6:
         /* "optimizer_inliner_multireturn/input.sol":219:225  uint x */
       0x00
         /* "optimizer_inliner_multireturn/input.sol":241:242  1 */
       0x01
         /* "optimizer_inliner_multireturn/input.sol":214:290  for((uint x, uint y) = (0, 1); x < 10; (x, y) = test(x))... */
-    tag_7:
+    tag_8:
         /* "optimizer_inliner_multireturn/input.sol":249:251  10 */
       0x0a
         /* "optimizer_inliner_multireturn/input.sol":245:246  x */
@@ -68,7 +68,7 @@ sub_0: assembly {
       lt
         /* "optimizer_inliner_multireturn/input.sol":214:290  for((uint x, uint y) = (0, 1); x < 10; (x, y) = test(x))... */
       iszero
-      tag_8
+      tag_9
       jumpi
       pop
         /* "optimizer_inliner_multireturn/input.sol":146:147  1 */
@@ -78,8 +78,8 @@ sub_0: assembly {
       add
       swap1
         /* "optimizer_inliner_multireturn/input.sol":214:290  for((uint x, uint y) = (0, 1); x < 10; (x, y) = test(x))... */
-      jump(tag_7)
-    tag_8:
+      jump(tag_8)
+    tag_9:
       pop
       pop
         /* "optimizer_inliner_multireturn/input.sol":179:296  function f() public pure {... */

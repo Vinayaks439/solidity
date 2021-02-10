@@ -10,7 +10,7 @@ EVM assembly:
   not(sub(shl(0x40, 0x01), 0x01))
   and
     /* "optimizer_BlockDeDuplicator/input.sol":201:206  fun_x */
-  or(tag_0_7, shl(0x20, tag_4))
+  or(tag_0_8, shl(0x20, tag_4))
   sub(shl(0x40, 0x01), 0x01)
     /* "optimizer_BlockDeDuplicator/input.sol":179:210  function() r = true ? fun_x : f */
   and
@@ -21,19 +21,19 @@ EVM assembly:
   callvalue
   dup1
   iszero
-  tag_5
+  tag_6
   jumpi
   0x00
   dup1
   revert
-tag_5:
+tag_6:
   pop
-  jump(tag_6)
+  jump(tag_7)
     /* "optimizer_BlockDeDuplicator/input.sol":77:103  function fun_x() public {} */
 tag_4:
   jump	// out
     /* "optimizer_BlockDeDuplicator/input.sol":60:213  contract C {... */
-tag_6:
+tag_7:
   dataSize(sub_0)
   dup1
   dataOffset(sub_0)
@@ -49,42 +49,42 @@ sub_0: assembly {
       callvalue
       dup1
       iszero
-      tag_1
+      tag_2
       jumpi
       0x00
       dup1
       revert
-    tag_1:
+    tag_2:
       pop
-      jumpi(tag_2, lt(calldatasize, 0x04))
+      jumpi(tag_3, lt(calldatasize, 0x04))
       shr(0xe0, calldataload(0x00))
       dup1
       0x26121ff0
       eq
-      tag_3
+      tag_4
       jumpi
       dup1
       0x2e1fb2bc
       eq
-      tag_4
+      tag_5
       jumpi
       dup1
       0x4753a67d
       eq
-      tag_4
+      tag_5
       jumpi
-    tag_2:
+    tag_3:
       0x00
       dup1
       revert
         /* "optimizer_BlockDeDuplicator/input.sol":138:174  function f() public { true ? 1 : 3;} */
-    tag_3:
+    tag_4:
       stop
         /* "optimizer_BlockDeDuplicator/input.sol":108:133  function fun_() public {} */
-    tag_4:
-      jump(tag_3)
+    tag_5:
+      jump(tag_4)
         /* "optimizer_BlockDeDuplicator/input.sol":138:174  function f() public { true ? 1 : 3;} */
-    tag_7:
+    tag_8:
       jump	// out
 
     auxdata: <AUXDATA REMOVED>

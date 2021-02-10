@@ -37,7 +37,7 @@ Text representation:
   callvalue
     /* "strict_asm_optimizer_steps/input.yul":58:60   */
   iszero
-  tag_1
+  tag_2
   jumpi
     /* "strict_asm_optimizer_steps/input.yul":85:86   */
   0x00
@@ -46,7 +46,7 @@ Text representation:
     /* "strict_asm_optimizer_steps/input.yul":75:87   */
   revert
     /* "strict_asm_optimizer_steps/input.yul":58:60   */
-tag_1:
+tag_2:
     /* "strict_asm_optimizer_steps/input.yul":98:163   */
   dataSize(sub_0)
   dataOffset(sub_0)
