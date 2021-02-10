@@ -171,7 +171,7 @@ BOOST_AUTO_TEST_CASE(function_trivial)
 		function f() { }
 	})";
 	BOOST_CHECK_EQUAL(assemble(in),
-		"PUSH1 0x6 JUMP JUMPDEST JUMPDEST JUMP JUMPDEST "
+		"PUSH1 0x5 JUMP JUMPDEST JUMP JUMPDEST "
 	);
 }
 
@@ -181,8 +181,8 @@ BOOST_AUTO_TEST_CASE(function_retparam)
 		function f() -> x, y { }
 	})";
 	BOOST_CHECK_EQUAL(assemble(in),
-		"PUSH1 0xC JUMP "
-		"JUMPDEST PUSH1 0x0 PUSH1 0x0 JUMPDEST SWAP1 SWAP2 JUMP "
+		"PUSH1 0xB JUMP "
+		"JUMPDEST PUSH1 0x0 PUSH1 0x0 SWAP1 SWAP2 JUMP "
 		"JUMPDEST "
 	);
 }
@@ -192,7 +192,7 @@ BOOST_AUTO_TEST_CASE(function_params)
 	string in = R"({
 		function f(a, b) { }
 	})";
-	BOOST_CHECK_EQUAL(assemble(in), "PUSH1 0x8 JUMP JUMPDEST JUMPDEST POP POP JUMP JUMPDEST ");
+	BOOST_CHECK_EQUAL(assemble(in), "PUSH1 0x7 JUMP JUMPDEST POP POP JUMP JUMPDEST ");
 }
 
 BOOST_AUTO_TEST_CASE(function_params_and_retparams)
@@ -205,7 +205,7 @@ BOOST_AUTO_TEST_CASE(function_params_and_retparams)
 	// layout for a function is still fixed, even though parameters
 	// can be re-used.
 	BOOST_CHECK_EQUAL(assemble(in),
-		"PUSH1 0x11 JUMP JUMPDEST PUSH1 0x0 PUSH1 0x0 JUMPDEST SWAP5 POP SWAP5 SWAP3 POP POP POP JUMP JUMPDEST "
+		"PUSH1 0x10 JUMP JUMPDEST PUSH1 0x0 PUSH1 0x0 SWAP5 POP SWAP5 SWAP3 POP POP POP JUMP JUMPDEST "
 	);
 }
 
@@ -232,10 +232,10 @@ BOOST_AUTO_TEST_CASE(function_retparam_unassigned)
 		function f() -> x { pop(callvalue()) }
 	})";
 	BOOST_CHECK_EQUAL(assemble(in),
-		"PUSH1 0xB JUMP "
+		"PUSH1 0xA JUMP "
 		"JUMPDEST "
 		"CALLVALUE POP "
-		"PUSH1 0x0 JUMPDEST "
+		"PUSH1 0x0 "
 		"SWAP1 JUMP "
 		"JUMPDEST "
 	);
@@ -247,10 +247,10 @@ BOOST_AUTO_TEST_CASE(function_retparam_unassigned_multiple)
 		function f() -> x, y, z { pop(callvalue()) }
 	})";
 	BOOST_CHECK_EQUAL(assemble(in),
-		"PUSH1 0x11 JUMP "
+		"PUSH1 0x10 JUMP "
 		"JUMPDEST "
 		"CALLVALUE POP "
-		"PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 JUMPDEST "
+		"PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 "
 		"SWAP1 SWAP2 SWAP3 JUMP JUMPDEST "
 	);
 }
@@ -377,20 +377,75 @@ BOOST_AUTO_TEST_CASE(function_argument_reuse)
 		"PUSH1 0x17 JUMP " // jump over f
 		"JUMPDEST " // start of f
 		"ADDRESS POP " // pop(address())
-		"DUP3 DUP2 SSTORE " // sstore(a, c)
+		"DUP3 DUP2 SSTORE "  // sstore(a, c)
+		"POP " // c is no longer used
 		"CALLVALUE POP " // pop(callvalue())
 		"PUSH1 0x0 " // init of x
-		"DUP3 " // b
-		"SWAP1 POP " // x := b
+		"DUP2 SWAP1 POP "  // x := b
 		"JUMPDEST " // exit tag
-		"SWAP4 SWAP3 " // move return tag and x
-		"POP POP POP " // pop arguments
+		"SWAP3 SWAP2 " // move return tag and x
+		"POP POP " // pop arguments
 		"JUMP " // return
 		"JUMPDEST "
 	);
 }
 
-
+BOOST_AUTO_TEST_CASE(function_many_arguments)
+{
+	string in = R"({
+		function f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20) -> x {
+			mstore(0x0100, a1)
+			mstore(0x0120, a2)
+			mstore(0x0140, a3)
+			mstore(0x0160, a4)
+			mstore(0x0180, a5)
+			mstore(0x01A0, a6)
+			mstore(0x01C0, a7)
+			mstore(0x01E0, a8)
+			mstore(0x0200, a9)
+			mstore(0x0220, a10)
+			mstore(0x0240, a11)
+			mstore(0x0260, a12)
+			mstore(0x0280, a13)
+			mstore(0x02A0, a14)
+			mstore(0x02C0, a15)
+			mstore(0x02E0, a16)
+			mstore(0x0300, a17)
+			mstore(0x0320, a18)
+			mstore(0x0340, a19)
+			x := a20
+		}
+	})";
+	BOOST_CHECK_EQUAL(assemble(in),
+		"PUSH1 0x80 JUMP " // jump over f
+		"JUMPDEST " // start of f
+		"DUP1 PUSH2 0x100 MSTORE POP " // store a1
+		"DUP1 PUSH2 0x120 MSTORE POP " // store a2
+		"DUP1 PUSH2 0x140 MSTORE POP " // store a3
+		"DUP1 PUSH2 0x160 MSTORE POP " // store a4
+		"DUP1 PUSH2 0x180 MSTORE POP " // store a5
+		"DUP1 PUSH2 0x1A0 MSTORE POP " // store a6
+		"DUP1 PUSH2 0x1C0 MSTORE POP " // store a7
+		"DUP1 PUSH2 0x1E0 MSTORE POP " // store a8
+		"DUP1 PUSH2 0x200 MSTORE POP " // store a9
+		"DUP1 PUSH2 0x220 MSTORE POP " // store a10
+		"DUP1 PUSH2 0x240 MSTORE POP " // store a11
+		"DUP1 PUSH2 0x260 MSTORE POP " // store a12
+		"DUP1 PUSH2 0x280 MSTORE POP " // store a13
+		"DUP1 PUSH2 0x2A0 MSTORE POP " // store a14
+		"DUP1 PUSH2 0x2C0 MSTORE POP " // store a15
+		"DUP1 PUSH2 0x2E0 MSTORE POP " // store a16
+		"DUP1 PUSH2 0x300 MSTORE POP " // store a17
+		"DUP1 PUSH2 0x320 MSTORE POP " // store a18
+		"DUP1 PUSH2 0x340 MSTORE POP " // store a19
+		"PUSH1 0x0 DUP2 SWAP1 POP " // x := a20
+		"JUMPDEST " // exit tag
+		"SWAP2 SWAP1 " // move x and return tag
+		"POP " // pop a20
+		"JUMP " // return
+		"JUMPDEST "
+	);
+}
 
 BOOST_AUTO_TEST_CASE(function_with_body_embedded)
 {
@@ -424,9 +479,9 @@ BOOST_AUTO_TEST_CASE(function_call)
 	})";
 	BOOST_CHECK_EQUAL(assemble(in),
 		"PUSH1 0x9 PUSH1 0x2 PUSH1 0x1 PUSH1 0xD JUMP "
-		"JUMPDEST PUSH1 0x16 JUMP " // jump over f
-		"JUMPDEST PUSH1 0x0 JUMPDEST SWAP3 SWAP2 POP POP JUMP " // f
-		"JUMPDEST PUSH1 0x20 PUSH1 0x4 PUSH1 0x3 PUSH1 0xD JUMP "
+		"JUMPDEST PUSH1 0x15 JUMP " // jump over f
+		"JUMPDEST PUSH1 0x0 SWAP3 SWAP2 POP POP JUMP " // f
+		"JUMPDEST PUSH1 0x1F PUSH1 0x4 PUSH1 0x3 PUSH1 0xD JUMP "
 		"JUMPDEST SWAP1 POP POP "
 	);
 }
@@ -444,15 +499,15 @@ BOOST_AUTO_TEST_CASE(functions_multi_return)
 		let unused := 7
 	})";
 	BOOST_CHECK_EQUAL(assemble(in),
-		"PUSH1 0x15 JUMP "
-		"JUMPDEST PUSH1 0x0 JUMPDEST SWAP3 SWAP2 POP POP JUMP " // f
-		"JUMPDEST PUSH1 0x0 PUSH1 0x0 JUMPDEST SWAP1 SWAP2 JUMP " // g
-		"JUMPDEST PUSH1 0x1F PUSH1 0x2 PUSH1 0x1 PUSH1 0x3 JUMP " // f(1, 2)
-		"JUMPDEST PUSH1 0x29 PUSH1 0x4 PUSH1 0x3 PUSH1 0x3 JUMP " // f(3, 4)
+		"PUSH1 0x13 JUMP "
+		"JUMPDEST PUSH1 0x0 SWAP3 SWAP2 POP POP JUMP " // f
+		"JUMPDEST PUSH1 0x0 PUSH1 0x0 SWAP1 SWAP2 JUMP " // g
+		"JUMPDEST PUSH1 0x1D PUSH1 0x2 PUSH1 0x1 PUSH1 0x3 JUMP " // f(1, 2)
+		"JUMPDEST PUSH1 0x27 PUSH1 0x4 PUSH1 0x3 PUSH1 0x3 JUMP " // f(3, 4)
 		"JUMPDEST SWAP1 POP " // assignment to x
 		"POP " // remove x
-		"PUSH1 0x32 PUSH1 0xC JUMP " // g()
-		"JUMPDEST PUSH1 0x38 PUSH1 0xC JUMP " // g()
+		"PUSH1 0x30 PUSH1 0xB JUMP " // g()
+		"JUMPDEST PUSH1 0x36 PUSH1 0xB JUMP " // g()
 		"JUMPDEST SWAP2 POP SWAP2 POP " // assignments
 		"POP POP " // removal of y and z
 		"PUSH1 0x7 POP "
@@ -466,9 +521,9 @@ BOOST_AUTO_TEST_CASE(reuse_slots_function)
 		let a, b, c, d := f() let x1 := 2 let y1 := 3 mstore(x1, a) mstore(y1, c)
 	})";
 	BOOST_CHECK_EQUAL(assemble(in),
-		"PUSH1 0x12 JUMP "
-		"JUMPDEST PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 JUMPDEST SWAP1 SWAP2 SWAP3 SWAP4 JUMP "
-		"JUMPDEST PUSH1 0x18 PUSH1 0x3 JUMP "
+		"PUSH1 0x11 JUMP "
+		"JUMPDEST PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 SWAP1 SWAP2 SWAP3 SWAP4 JUMP "
+		"JUMPDEST PUSH1 0x17 PUSH1 0x3 JUMP "
 		// Stack: a b c d
 		"JUMPDEST POP " // d is unused
 		// Stack: a b c
@@ -494,9 +549,9 @@ BOOST_AUTO_TEST_CASE(reuse_slots_function_with_gaps)
 	BOOST_CHECK_EQUAL(assemble(in),
 		"PUSH1 0x5 PUSH1 0x6 PUSH1 0x7 "
 		"DUP2 DUP4 MSTORE "
-		"PUSH1 0x1B JUMP " // jump across function
-		"JUMPDEST PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 JUMPDEST SWAP1 SWAP2 SWAP3 SWAP4 JUMP "
-		"JUMPDEST PUSH1 0x21 PUSH1 0xC JUMP "
+		"PUSH1 0x1A JUMP " // jump across function
+		"JUMPDEST PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 PUSH1 0x0 SWAP1 SWAP2 SWAP3 SWAP4 JUMP "
+		"JUMPDEST PUSH1 0x20 PUSH1 0xC JUMP "
 		// stack: x1 x2 x3 a b c d
 		"JUMPDEST SWAP6 POP " // move d into x1
 		// stack: d x2 x3 a b c

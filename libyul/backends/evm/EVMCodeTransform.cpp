@@ -110,7 +110,8 @@ CodeTransform::CodeTransform(
 	ExternalIdentifierAccess _identifierAccess,
 	bool _useNamedLabelsForFunctions,
 	shared_ptr<Context> _context,
-	vector<YulString> _delayedReturnVariables
+	vector<YulString> _delayedReturnVariables,
+	optional<int> _returnStackHeight
 ):
 	m_assembly(_assembly),
 	m_info(_analysisInfo),
@@ -121,7 +122,8 @@ CodeTransform::CodeTransform(
 	m_useNamedLabelsForFunctions(_useNamedLabelsForFunctions),
 	m_identifierAccess(move(_identifierAccess)),
 	m_context(move(_context)),
-	m_delayedReturnVariables(move(_delayedReturnVariables))
+	m_delayedReturnVariables(move(_delayedReturnVariables)),
+	m_returnStackHeight(_returnStackHeight)
 {
 	if (!m_context)
 	{
@@ -154,13 +156,14 @@ void CodeTransform::freeUnusedVariables(bool _popUnusedSlotsAtStackTop)
 	if (!m_allowStackOpt)
 		return;
 
-	for (auto const& identifier: m_scope->identifiers)
-		if (holds_alternative<Scope::Variable>(identifier.second))
-		{
-			Scope::Variable const& var = std::get<Scope::Variable>(identifier.second);
-			if (m_variablesScheduledForDeletion.count(&var))
-				deleteVariable(var);
-		}
+	if (!m_returnStackHeight.has_value())
+		while (!m_variablesScheduledForDeletion.empty())
+			deleteVariable(**m_variablesScheduledForDeletion.begin());
+	else
+		for (auto const& identifier: m_scope->identifiers)
+			if (Scope::Variable const* var = get_if<Scope::Variable>(&identifier.second))
+				if (m_variablesScheduledForDeletion.count(var))
+					deleteVariable(*var);
 
 	if (_popUnusedSlotsAtStackTop)
 		while (m_unusedStackSlots.count(m_assembly.stackHeight() - 1))
@@ -434,26 +437,30 @@ void CodeTransform::operator()(FunctionDefinition const& _function)
 	m_assembly.setStackHeight(static_cast<int>(height));
 
 	vector<YulString> deferredReturnVariables;
+	optional<int> returnStackHeight;
 
 	if (m_allowStackOpt)
 		deferredReturnVariables = _function.returnVariables |
 			ranges::views::transform([](auto const& _var) { return _var.name; }) |
 			ranges::to<vector<YulString>>;
 	else
+	{
 		for (auto const& v: _function.returnVariables)
 		{
-				auto& var = std::get<Scope::Variable>(varScope->identifiers.at(v.name));
-				m_context->variableStackHeights[&var] = height++;
-				// Preset stack slots for return variables to zero.
-				m_assembly.appendConstant(u256(0));
+			auto& var = std::get<Scope::Variable>(varScope->identifiers.at(v.name));
+			m_context->variableStackHeights[&var] = height++;
+			// Preset stack slots for return variables to zero.
+			m_assembly.appendConstant(u256(0));
 		}
+		m_context->functionExitPoints.push(
+			CodeTransformContext::JumpInfo{
+				m_assembly.newLabelId(),
+				m_assembly.stackHeight()
+			}
+		);
+		returnStackHeight = m_assembly.stackHeight();
+	}
 
-	m_context->functionExitPoints.push(
-		CodeTransformContext::JumpInfo{
-			m_assembly.newLabelId(),
-			m_assembly.stackHeight() + static_cast<int>(deferredReturnVariables.size())
-		}
-	);
 	CodeTransform subTransform(
 		m_assembly,
 		m_info,
@@ -465,7 +472,8 @@ void CodeTransform::operator()(FunctionDefinition const& _function)
 		m_identifierAccess,
 		m_useNamedLabelsForFunctions,
 		m_context,
-		move(deferredReturnVariables)
+		move(deferredReturnVariables),
+		returnStackHeight
 	);
 	subTransform(_function.body);
 	if (!subTransform.m_stackErrors.empty())
@@ -479,12 +487,11 @@ void CodeTransform::operator()(FunctionDefinition const& _function)
 		}
 	}
 
-	if (!subTransform.m_delayedReturnVariables.empty())
+	if (!subTransform.m_returnStackHeight.has_value())
 	{
 		// Can only happen for functions with straight control flow (in particular no jump to the exit label)
 		// that never reads from or writes to return variables.
 
-		// We should have allocated slots either for all or for none of the return variables.
 		yulAssert(subTransform.m_delayedReturnVariables.size() == _function.returnVariables.size(), "");
 
 		// Already pop all arguments to make the stack shuffling below easier.
@@ -500,9 +507,13 @@ void CodeTransform::operator()(FunctionDefinition const& _function)
 			m_assembly.appendConstant(u256(0));
 		}
 	}
+	else
+	{
+		appendPopUntil(*subTransform.m_returnStackHeight);
 
-	m_assembly.appendLabel(m_context->functionExitPoints.top().label);
-	m_context->functionExitPoints.pop();
+		m_assembly.appendLabel(m_context->functionExitPoints.top().label);
+		m_context->functionExitPoints.pop();
+	}
 
 	{
 		// The stack layout here is:
@@ -644,12 +655,11 @@ void CodeTransform::operator()(Block const& _block)
 	Scope* originalScope = m_scope;
 	m_scope = m_info.scopes.at(&_block).get();
 
-	int blockStartStackHeight = m_assembly.stackHeight() + static_cast<int>(m_delayedReturnVariables.size());
+	int blockStartStackHeight = m_assembly.stackHeight();
+	bool hadReturnStackHeight = m_returnStackHeight.has_value();
 	visitStatements(_block.statements);
-	if (!m_delayedReturnVariables.empty())
-		blockStartStackHeight -= static_cast<int>(m_delayedReturnVariables.size());
 
-	finalizeBlock(_block, blockStartStackHeight);
+	finalizeBlock(_block, hadReturnStackHeight ? make_optional(blockStartStackHeight) : nullopt);
 	m_scope = originalScope;
 }
 
@@ -681,7 +691,7 @@ void CodeTransform::visitStatements(vector<Statement> const& _statements)
 	{
 		freeUnusedVariables();
 
-		if (!m_delayedReturnVariables.empty() && (
+		if (!m_returnStackHeight.has_value() && (
 			holds_alternative<VariableDeclaration>(statement) ||
 			holds_alternative<Leave>(statement) ||
 			holds_alternative<ForLoop>(statement) ||
@@ -705,18 +715,17 @@ void CodeTransform::visitStatements(vector<Statement> const& _statements)
 				m_context->variableStackHeights[var] = static_cast<size_t>(m_assembly.stackHeight());
 				// Preset stack slots for return variables to zero.
 				m_assembly.appendConstant(u256(0));
-				if (!m_unusedStackSlots.empty())
-				{
-					auto slot = static_cast<size_t>(*m_unusedStackSlots.begin());
-					m_unusedStackSlots.erase(m_unusedStackSlots.begin());
-					m_context->variableStackHeights[var] = slot;
-					if (size_t heightDiff = variableHeightDiff(*var, _returnVariableName, true))
-						m_assembly.appendInstruction(evmasm::swapInstruction(static_cast<unsigned>(heightDiff - 1)));
-					m_assembly.appendInstruction(evmasm::Instruction::POP);
-				}
 				++m_context->variableReferences[var];
 			}
 			m_delayedReturnVariables.clear();
+			m_context->functionExitPoints.push(
+				CodeTransformContext::JumpInfo{
+					m_assembly.newLabelId(),
+					m_assembly.stackHeight()
+				}
+			);
+			m_returnStackHeight = m_assembly.stackHeight();
+			m_unusedStackSlots.clear();
 		}
 
 		auto const* functionDefinition = std::get_if<FunctionDefinition>(&statement);
@@ -741,7 +750,7 @@ void CodeTransform::visitStatements(vector<Statement> const& _statements)
 	freeUnusedVariables();
 }
 
-void CodeTransform::finalizeBlock(Block const& _block, int blockStartStackHeight)
+void CodeTransform::finalizeBlock(Block const& _block, optional<int> blockStartStackHeight)
 {
 	m_assembly.setSourceLocation(_block.location);
 
@@ -762,8 +771,11 @@ void CodeTransform::finalizeBlock(Block const& _block, int blockStartStackHeight
 				m_assembly.appendInstruction(evmasm::Instruction::POP);
 		}
 
-	int deposit = m_assembly.stackHeight() - blockStartStackHeight;
-	yulAssert(deposit == 0, "Invalid stack height at end of block: " + to_string(deposit));
+	if (blockStartStackHeight)
+	{
+		int deposit = m_assembly.stackHeight() - *blockStartStackHeight;
+		yulAssert(deposit == 0, "Invalid stack height at end of block: " + to_string(deposit));
+	}
 }
 
 void CodeTransform::generateMultiAssignment(vector<Identifier> const& _variableNames)

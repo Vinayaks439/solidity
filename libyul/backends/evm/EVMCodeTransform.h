@@ -142,7 +142,8 @@ public:
 		_identifierAccess,
 		_useNamedLabelsForFunctions,
 		nullptr,
-		{}
+		{},
+		std::nullopt
 	)
 	{
 	}
@@ -163,7 +164,8 @@ protected:
 		ExternalIdentifierAccess _identifierAccess,
 		bool _useNamedLabelsForFunctions,
 		std::shared_ptr<Context> _context,
-		std::vector<YulString> _delayedReturnVariables
+		std::vector<YulString> _delayedReturnVariables,
+		std::optional<int> _returnStackHeight
 	);
 
 	void decreaseReference(YulString _name, Scope::Variable const& _var);
@@ -202,7 +204,7 @@ private:
 
 	/// Pops all variables declared in the block and checks that the stack height is equal
 	/// to @a _blockStartStackHeight.
-	void finalizeBlock(Block const& _block, int _blockStartStackHeight);
+	void finalizeBlock(Block const& _block, std::optional<int> _blockStartStackHeight);
 
 	void generateMultiAssignment(std::vector<Identifier> const& _variableNames);
 	void generateAssignment(Identifier const& _variableName);
@@ -242,6 +244,7 @@ private:
 	std::set<int> m_unusedStackSlots;
 
 	std::vector<YulString> m_delayedReturnVariables;
+	std::optional<int> m_returnStackHeight;
 
 	std::vector<StackTooDeepError> m_stackErrors;
 };
