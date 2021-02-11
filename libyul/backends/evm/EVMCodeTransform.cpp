@@ -111,7 +111,7 @@ CodeTransform::CodeTransform(
 	bool _useNamedLabelsForFunctions,
 	shared_ptr<Context> _context,
 	vector<YulString> _delayedReturnVariables,
-	optional<int> _returnStackHeight
+	optional<AbstractAssembly::LabelID> _functionExitLabel
 ):
 	m_assembly(_assembly),
 	m_info(_analysisInfo),
@@ -123,7 +123,7 @@ CodeTransform::CodeTransform(
 	m_identifierAccess(move(_identifierAccess)),
 	m_context(move(_context)),
 	m_delayedReturnVariables(move(_delayedReturnVariables)),
-	m_returnStackHeight(_returnStackHeight)
+	m_functionExitLabel(_functionExitLabel)
 {
 	if (!m_context)
 	{
@@ -450,13 +450,12 @@ void CodeTransform::operator()(FunctionDefinition const& _function)
 		_function.returnVariables |
 		ranges::views::transform([](auto const& _var) { return _var.name; }) |
 		ranges::to<vector<YulString>>,
-		nullopt
+		m_assembly.newLabelId()
 	);
 	if (!m_allowStackOpt)
 	{
 		subTransform.m_scope = varScope;
 		subTransform.allocateReturnSlotsIfNeeded(nullptr);
-		subTransform.m_scope = nullptr;
 	}
 	subTransform(_function.body);
 	if (!subTransform.m_stackErrors.empty())
@@ -471,32 +470,17 @@ void CodeTransform::operator()(FunctionDefinition const& _function)
 	}
 
 	if (!subTransform.m_returnStackHeight.has_value())
-	{
-		// Can only happen for functions with straight control flow (in particular no jump to the exit label)
-		// that never reads from or writes to return variables.
-
-		yulAssert(subTransform.m_delayedReturnVariables.size() == _function.returnVariables.size(), "");
-
-		// Already pop all arguments to make the stack shuffling below easier.
-		while (m_assembly.stackHeight() > (m_evm15 ? 0 : 1))
-			m_assembly.appendInstruction(evmasm::Instruction::POP);
-
-		for (auto const& _returnVariable: _function.returnVariables)
-		{
-			auto* var = std::get_if<Scope::Variable>(&varScope->identifiers.at(_returnVariable.name));
-			yulAssert(var, "Return variable not in scope.");
-			m_context->variableStackHeights[var] = static_cast<size_t>(m_assembly.stackHeight());
-			// Set unassigned return variables to zero.
-			m_assembly.appendConstant(u256(0));
-		}
-	}
+		subTransform.allocateReturnSlotsIfNeeded(nullptr);
 	else
-	{
 		appendPopUntil(*subTransform.m_returnStackHeight);
 
-		m_assembly.appendLabel(m_context->functionExitPoints.top().label);
-		m_context->functionExitPoints.pop();
-	}
+	assertThrow(
+		subTransform.m_returnStackHeight && *subTransform.m_returnStackHeight == m_assembly.stackHeight(),
+		OptimizerException,
+		""
+	);
+
+	m_assembly.appendLabel(*subTransform.m_functionExitLabel);
 
 	{
 		// The stack layout here is:
@@ -623,12 +607,10 @@ void CodeTransform::operator()(Continue const& _continue)
 
 void CodeTransform::operator()(Leave const& _leaveStatement)
 {
-	yulAssert(!m_context->functionExitPoints.empty(), "Invalid leave-statement. Requires surrounding function in code generation.");
-	m_assembly.setSourceLocation(_leaveStatement.location);
-
+	yulAssert(m_functionExitLabel, "Invalid leave-statement. Requires surrounding function in code generation.");
 	yulAssert(m_returnStackHeight, "");
-	Context::JumpInfo const& jump = m_context->functionExitPoints.top();
-	m_assembly.appendJumpTo(jump.label, appendPopUntil(jump.targetStackHeight));
+	m_assembly.setSourceLocation(_leaveStatement.location);
+	m_assembly.appendJumpTo(*m_functionExitLabel, appendPopUntil(*m_returnStackHeight));
 }
 
 void CodeTransform::operator()(Block const& _block)
@@ -695,12 +677,6 @@ void CodeTransform::allocateReturnSlotsIfNeeded(Statement const* _statement)
 
 	m_delayedReturnVariables.clear();
 	m_returnStackHeight = m_assembly.stackHeight();
-	m_context->functionExitPoints.push(
-		CodeTransformContext::JumpInfo{
-			m_assembly.newLabelId(),
-			m_assembly.stackHeight()
-		}
-	);
 	m_unusedStackSlots.clear();
 }
 

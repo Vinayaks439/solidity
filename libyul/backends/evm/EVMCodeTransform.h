@@ -77,7 +77,6 @@ struct CodeTransformContext
 	};
 
 	std::stack<ForLoopLabels> forLoopStack;
-	std::stack<JumpInfo> functionExitPoints;
 };
 
 /**
@@ -165,7 +164,7 @@ protected:
 		bool _useNamedLabelsForFunctions,
 		std::shared_ptr<Context> _context,
 		std::vector<YulString> _delayedReturnVariables,
-		std::optional<int> _returnStackHeight
+		std::optional<AbstractAssembly::LabelID> _functionExitLabel
 	);
 
 	void decreaseReference(YulString _name, Scope::Variable const& _var);
@@ -253,6 +252,9 @@ private:
 	/// return variables were assigned slots. Used as the stack height for the jump
 	/// destination of ``leave`` statements.
 	std::optional<int> m_returnStackHeight;
+
+	/// Function exit label.
+	std::optional<AbstractAssembly::LabelID> m_functionExitLabel;
 
 	std::vector<StackTooDeepError> m_stackErrors;
 };
