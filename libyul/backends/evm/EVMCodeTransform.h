@@ -226,8 +226,9 @@ private:
 	/// Returns the number of POP statements that have been appended.
 	int appendPopUntil(int _targetDepth);
 
-	/// Allocates stack slots for remaining delayed return values, if @a _statement requires them.
-	void allocateReturnSlotsIfNeeded(Statement const& _statement);
+	/// Allocates stack slots for remaining delayed return values, if @a _statement is not nullptr,
+	/// the allocation is only done if the statement requires it.
+	void allocateReturnSlotsIfNeeded(Statement const* _statement);
 
 	AbstractAssembly& m_assembly;
 	AsmAnalysisInfo& m_info;
@@ -247,7 +248,6 @@ private:
 	std::set<int> m_unusedStackSlots;
 
 	/// A list of return variables that have not yet been allocated stack slots yet.
-	/// Can only be non-empty with enabled stack optimizations.
 	std::vector<YulString> m_delayedReturnVariables;
 	/// The minimal stack height covering all return variables. Only set after all
 	/// return variables were assigned slots. Used as the stack height for the jump

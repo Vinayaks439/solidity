@@ -436,31 +436,6 @@ void CodeTransform::operator()(FunctionDefinition const& _function)
 
 	m_assembly.setStackHeight(static_cast<int>(height));
 
-	vector<YulString> deferredReturnVariables;
-	optional<int> returnStackHeight;
-
-	if (m_allowStackOpt)
-		deferredReturnVariables = _function.returnVariables |
-			ranges::views::transform([](auto const& _var) { return _var.name; }) |
-			ranges::to<vector<YulString>>;
-	else
-	{
-		for (auto const& v: _function.returnVariables)
-		{
-			auto& var = std::get<Scope::Variable>(varScope->identifiers.at(v.name));
-			m_context->variableStackHeights[&var] = height++;
-			// Preset stack slots for return variables to zero.
-			m_assembly.appendConstant(u256(0));
-		}
-		m_context->functionExitPoints.push(
-			CodeTransformContext::JumpInfo{
-				m_assembly.newLabelId(),
-				m_assembly.stackHeight()
-			}
-		);
-		returnStackHeight = m_assembly.stackHeight();
-	}
-
 	CodeTransform subTransform(
 		m_assembly,
 		m_info,
@@ -472,9 +447,17 @@ void CodeTransform::operator()(FunctionDefinition const& _function)
 		m_identifierAccess,
 		m_useNamedLabelsForFunctions,
 		m_context,
-		move(deferredReturnVariables),
-		returnStackHeight
+		_function.returnVariables |
+		ranges::views::transform([](auto const& _var) { return _var.name; }) |
+		ranges::to<vector<YulString>>,
+		nullopt
 	);
+	if (!m_allowStackOpt)
+	{
+		subTransform.m_scope = varScope;
+		subTransform.allocateReturnSlotsIfNeeded(nullptr);
+		subTransform.m_scope = nullptr;
+	}
 	subTransform(_function.body);
 	if (!subTransform.m_stackErrors.empty())
 	{
@@ -643,6 +626,7 @@ void CodeTransform::operator()(Leave const& _leaveStatement)
 	yulAssert(!m_context->functionExitPoints.empty(), "Invalid leave-statement. Requires surrounding function in code generation.");
 	m_assembly.setSourceLocation(_leaveStatement.location);
 
+	yulAssert(m_returnStackHeight, "");
 	Context::JumpInfo const& jump = m_context->functionExitPoints.top();
 	m_assembly.appendJumpTo(jump.label, appendPopUntil(jump.targetStackHeight));
 }
@@ -680,19 +664,19 @@ void CodeTransform::visitExpression(Expression const& _expression)
 	expectDeposit(1, height);
 }
 
-void CodeTransform::allocateReturnSlotsIfNeeded(Statement const& _statement)
+void CodeTransform::allocateReturnSlotsIfNeeded(Statement const* _statement)
 {
 	if (m_returnStackHeight.has_value())
 		return;
-	if (holds_alternative<FunctionDefinition>(_statement))
+	if (get_if<FunctionDefinition>(_statement))
 		return;
 	if (
-		holds_alternative<ExpressionStatement>(_statement) ||
-		holds_alternative<Assignment>(_statement)
+		get_if<ExpressionStatement>(_statement) ||
+		get_if<Assignment>(_statement)
 	)
 	{
 		ReferencesCounter referencesCounter{ReferencesCounter::CountWhat::OnlyVariables};
-		referencesCounter.visit(_statement);
+		referencesCounter.visit(*_statement);
 		auto isReferenced = [&](YulString _returnVariableName) {
 			return referencesCounter.references().count(_returnVariableName);
 		};
@@ -727,7 +711,7 @@ void CodeTransform::visitStatements(vector<Statement> const& _statements)
 	for (auto const& statement: _statements)
 	{
 		freeUnusedVariables();
-		allocateReturnSlotsIfNeeded(statement);
+		allocateReturnSlotsIfNeeded(&statement);
 
 		auto const* functionDefinition = std::get_if<FunctionDefinition>(&statement);
 		if (functionDefinition && !jumpTarget)
