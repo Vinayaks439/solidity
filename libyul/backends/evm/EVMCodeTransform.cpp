@@ -156,11 +156,12 @@ void CodeTransform::freeUnusedVariables(bool _popUnusedSlotsAtStackTop)
 	if (!m_allowStackOpt)
 		return;
 
-	if (!m_returnStackHeight.has_value())
-		while (!m_variablesScheduledForDeletion.empty())
-			deleteVariable(**m_variablesScheduledForDeletion.begin());
-	else
-		for (auto const& identifier: m_scope->identifiers)
+	for (auto const& identifier: m_scope->identifiers)
+		if (Scope::Variable const* var = get_if<Scope::Variable>(&identifier.second))
+			if (m_variablesScheduledForDeletion.count(var))
+				deleteVariable(*var);
+	if (m_scope->superScope && m_scope->superScope->functionScope)
+		for (auto const& identifier: m_scope->superScope->identifiers)
 			if (Scope::Variable const* var = get_if<Scope::Variable>(&identifier.second))
 				if (m_variablesScheduledForDeletion.count(var))
 					deleteVariable(*var);
@@ -619,10 +620,11 @@ void CodeTransform::operator()(Block const& _block)
 	m_scope = m_info.scopes.at(&_block).get();
 
 	int blockStartStackHeight = m_assembly.stackHeight();
-	bool hadReturnStackHeight = m_returnStackHeight.has_value();
+	bool isOutermostFunctionBody = m_scope && m_scope->superScope && m_scope->superScope->functionScope;
+	bool performValidation = m_returnStackHeight.has_value() || !isOutermostFunctionBody;
 	visitStatements(_block.statements);
 
-	finalizeBlock(_block, hadReturnStackHeight ? make_optional(blockStartStackHeight) : nullopt);
+	finalizeBlock(_block, performValidation ? make_optional(blockStartStackHeight) : nullopt);
 	m_scope = originalScope;
 }
 
@@ -650,6 +652,11 @@ void CodeTransform::allocateReturnSlotsIfNeeded(Statement const* _statement)
 {
 	if (m_returnStackHeight.has_value())
 		return;
+	if (m_delayedReturnVariables.empty())
+	{
+		m_returnStackHeight = m_evm15 ? 0 : 1;
+		return;
+	}
 	if (get_if<FunctionDefinition>(_statement))
 		return;
 	if (
@@ -674,10 +681,8 @@ void CodeTransform::allocateReturnSlotsIfNeeded(Statement const* _statement)
 		// Preset stack slots for return variables to zero.
 		m_assembly.appendConstant(u256(0));
 	}
-
 	m_delayedReturnVariables.clear();
 	m_returnStackHeight = m_assembly.stackHeight();
-	m_unusedStackSlots.clear();
 }
 
 void CodeTransform::visitStatements(vector<Statement> const& _statements)
