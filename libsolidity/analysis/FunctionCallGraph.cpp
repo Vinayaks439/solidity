@@ -57,16 +57,18 @@ FunctionCallGraphBuilder::FunctionCallGraphBuilder(ContractDefinition const& _co
 
 	for (FunctionTypePointer functionType: _contract.interfaceFunctionList() | views::transform(getSecondElement))
 	{
-		if (auto const* funcDef = dynamic_cast<FunctionDefinition const*>(&functionType->declaration()))
-		{
-			processFunction(funcDef);
+		auto const* function = dynamic_cast<FunctionDefinition const*>(&functionType->declaration());
+		auto const* variable = dynamic_cast<VariableDeclaration const*>(&functionType->declaration());
 
+		if (function)
+		{
 			// Add all external functions to the RuntimeDispatch
-			add(SpecialNode::Entry, &functionType->declaration());
+			processFunction(*function);
+			add(SpecialNode::Entry, function);
 		}
 		else
 			// If it's not a function, it must be a getter of a public variable; we ignore those
-			solAssert(dynamic_cast<VariableDeclaration const*>(&functionType->declaration()), "");
+			solAssert(variable, "");
 	}
 
 	// Add all InternalCreationDispatch calls to the RuntimeDispatch as well
@@ -120,11 +122,7 @@ bool FunctionCallGraphBuilder::visit(Identifier const& _identifier)
 
 		// For events kind() == Event, so we have an extra check here
 		if (funType && funType->kind() == FunctionType::Kind::Internal)
-		{
 			processFunction(callable->resolveVirtual(*m_contract), _identifier.annotation().calledDirectly);
-
-			solAssert(m_currentNode.has_value(), "");
-		}
 	}
 
 	return true;
