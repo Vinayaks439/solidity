@@ -200,12 +200,8 @@ BOOST_AUTO_TEST_CASE(function_params_and_retparams)
 	string in = R"({
 		function f(a, b, c, d) -> x, y { }
 	})";
-	// This does not re-use the parameters for the return parameters
-	// We do not expect parameters to be fully unused, so the stack
-	// layout for a function is still fixed, even though parameters
-	// can be re-used.
 	BOOST_CHECK_EQUAL(assemble(in),
-		"PUSH1 0x10 JUMP JUMPDEST PUSH1 0x0 PUSH1 0x0 SWAP5 POP SWAP5 SWAP3 POP POP POP JUMP JUMPDEST "
+		"PUSH1 0xF JUMP JUMPDEST POP POP POP POP PUSH1 0x0 PUSH1 0x0 SWAP1 SWAP2 JUMP JUMPDEST "
 	);
 }
 
@@ -479,9 +475,9 @@ BOOST_AUTO_TEST_CASE(function_call)
 	})";
 	BOOST_CHECK_EQUAL(assemble(in),
 		"PUSH1 0x9 PUSH1 0x2 PUSH1 0x1 PUSH1 0xD JUMP "
-		"JUMPDEST PUSH1 0x15 JUMP " // jump over f
-		"JUMPDEST PUSH1 0x0 SWAP3 SWAP2 POP POP JUMP " // f
-		"JUMPDEST PUSH1 0x1F PUSH1 0x4 PUSH1 0x3 PUSH1 0xD JUMP "
+		"JUMPDEST PUSH1 0x14 JUMP " // jump over f
+		"JUMPDEST POP POP PUSH1 0x0 SWAP1 JUMP " // f
+		"JUMPDEST PUSH1 0x1E PUSH1 0x4 PUSH1 0x3 PUSH1 0xD JUMP "
 		"JUMPDEST SWAP1 POP POP "
 	);
 }
@@ -499,15 +495,15 @@ BOOST_AUTO_TEST_CASE(functions_multi_return)
 		let unused := 7
 	})";
 	BOOST_CHECK_EQUAL(assemble(in),
-		"PUSH1 0x13 JUMP "
-		"JUMPDEST PUSH1 0x0 SWAP3 SWAP2 POP POP JUMP " // f
+		"PUSH1 0x12 JUMP "
+		"JUMPDEST POP POP PUSH1 0x0 SWAP1 JUMP " // f
 		"JUMPDEST PUSH1 0x0 PUSH1 0x0 SWAP1 SWAP2 JUMP " // g
-		"JUMPDEST PUSH1 0x1D PUSH1 0x2 PUSH1 0x1 PUSH1 0x3 JUMP " // f(1, 2)
-		"JUMPDEST PUSH1 0x27 PUSH1 0x4 PUSH1 0x3 PUSH1 0x3 JUMP " // f(3, 4)
+		"JUMPDEST PUSH1 0x1C PUSH1 0x2 PUSH1 0x1 PUSH1 0x3 JUMP " // f(1, 2)
+		"JUMPDEST PUSH1 0x26 PUSH1 0x4 PUSH1 0x3 PUSH1 0x3 JUMP " // f(3, 4)
 		"JUMPDEST SWAP1 POP " // assignment to x
 		"POP " // remove x
-		"PUSH1 0x30 PUSH1 0xB JUMP " // g()
-		"JUMPDEST PUSH1 0x36 PUSH1 0xB JUMP " // g()
+		"PUSH1 0x2F PUSH1 0xA JUMP " // g()
+		"JUMPDEST PUSH1 0x35 PUSH1 0xA JUMP " // g()
 		"JUMPDEST SWAP2 POP SWAP2 POP " // assignments
 		"POP POP " // removal of y and z
 		"PUSH1 0x7 POP "
