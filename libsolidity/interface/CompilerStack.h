@@ -98,6 +98,12 @@ public:
 		CompilationSuccessful
 	};
 
+	enum class MetadataFormat {
+		WithReleaseVersionTag,
+		WithPrereleaseVersionTag,
+		NoMetadata
+	};
+
 	enum class MetadataHash {
 		IPFS,
 		Bzzr1,
@@ -336,8 +342,8 @@ public:
 	/// @returns a JSON representing the estimated gas usage for contract creation, internal and external functions
 	Json::Value gasEstimates(std::string const& _contractName) const;
 
-	/// Overwrites the release/prerelease flag. Should only be used for testing.
-	void overwriteReleaseFlag(bool release) { m_release = release; }
+	/// Overwrites the metadata format. Should only be used for testing.
+	void setMetadataFormat(MetadataFormat _metadataFormat) { m_metadataFormat = _metadataFormat; }
 private:
 	/// The state per source unit. Filled gradually during parsing.
 	struct Source
@@ -496,7 +502,7 @@ private:
 	/// Whether or not there has been an error during processing.
 	/// If this is true, the stack will refuse to generate code.
 	bool m_hasError = false;
-	bool m_release = VersionIsRelease;
+	MetadataFormat m_metadataFormat = VersionIsRelease ? MetadataFormat::WithReleaseVersionTag : MetadataFormat::WithPrereleaseVersionTag;
 };
 
 }
